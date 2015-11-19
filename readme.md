@@ -1,3 +1,7 @@
+2015-11-18
+    tomcat-redis session 共享ok
+    dockerfile and fig.yml 默认设置为redis
+
 2015-06-16
     增加webjars 集群配置
     确保webapps 管理目录存在

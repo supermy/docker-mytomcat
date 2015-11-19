@@ -1,8 +1,37 @@
-FROM tutum/tomcat:7.0
+FROM supermy/docker-jre:7
+
+
+ENV TOMCAT_MAJOR_VERSION 7
+ENV TOMCAT_MINOR_VERSION 7.0.62
+ENV CATALINA_HOME /tomcat
+
+# INSTALL TOMCAT
+RUN wget -q https://archive.apache.org/dist/tomcat/tomcat-${TOMCAT_MAJOR_VERSION}/v${TOMCAT_MINOR_VERSION}/bin/apache-tomcat-${TOMCAT_MINOR_VERSION}.tar.gz && \
+    wget -qO- https://archive.apache.org/dist/tomcat/tomcat-${TOMCAT_MAJOR_VERSION}/v${TOMCAT_MINOR_VERSION}/bin/apache-tomcat-${TOMCAT_MINOR_VERSION}.tar.gz.md5 | md5sum -c - && \
+    tar zxf apache-tomcat-*.tar.gz && \
+    rm apache-tomcat-*.tar.gz && \
+    mv apache-tomcat* tomcat
+
+ADD create_tomcat_admin_user.sh /create_tomcat_admin_user.sh
+ADD run.sh /run.sh
+RUN chmod +x /*.sh
+
+EXPOSE 8080
+CMD ["/run.sh"]
+
+#--------------------
+
+
 COPY dbtest /tomcat/webapps/dbtest
 COPY dbtest /home/dbtest
-COPY lib-cluster/* /tomcat/lib/
+
+#此处修改为redis 需要的包
+COPY lib-cluster-redis/* /tomcat/lib/
+
 COPY lib-webjars/* /tomcat/lib/
+
+#COPY gs-accessing-data-rest-0.1.0.war /tomcat/webapps/rest.war
+
 
 
 
@@ -46,11 +75,15 @@ RUN  sed -i '/<Host/,/<\/Host>/{/<Valve/,/<\/Valve>/{/pattern=/{s/\/>/\/> \n <Co
 #RUN  sed -i '/<tomcat-users>/,/<\/tomcat-users>/d' /tomcat/conf/tomcat-users.xml
 
 #集群配置session共享；需要先启动session服务
+
+#配置redis 共享
 RUN  sed  -i '/<Context>/a  \
-      <Manager className="de.javakaffee.web.msm.MemcachedBackupSessionManager" \n \
-        memcachedNodes="n1:memcache1:11211,n2:memcache2:11211"  failoverNodes="n1" \n \
-        requestUriIgnorePattern=".*\.(ico|png|gif|jpg|css|js)$"  \n \
-        transcoderFactoryClass="de.javakaffee.web.msm.serializer.kryo.KryoTranscoderFactory" \/> \n \
+        <Valve className="com.radiadesign.catalina.session.RedisSessionHandlerValve" /> \
+        <Manager className="com.radiadesign.catalina.session.RedisSessionManager"  \
+                 host="myredis"  \
+                 port="6379" \
+                 database="0"  \
+                 maxInactiveInterval="60"/>  \n \
     ' /tomcat/conf/context.xml
 
 ###增加数据源
@@ -63,6 +96,7 @@ RUN  sed  -i '/<Context>/a  \
 
 
 RUN cat /tomcat/conf/context.xml
+
 
 #删除注释文件
 RUN sed -i '/<!–/,/–>/d' /tomcat/conf/server.xml
